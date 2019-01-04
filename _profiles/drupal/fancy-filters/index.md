@@ -29,7 +29,7 @@ categories:
   
 # Concepts
 By default, collection endpoints often return every resource object of a
-particular type available a server. It is usually necessary to limit these
+particular type available on a server. It is usually necessary to limit these
 responses to a subset of available resource objects based on client-defined
 parameters. The JSON:API specification stipulates that this filtering be done
 via [the `filter` query parameter](https://jsonapi.org/format/#fetching-filtering). However, it is agnostic about the strategy used.
@@ -66,40 +66,67 @@ A `filter` query parameter can have up to four components.
         |   3rd component
        _|_       _|_
       /   \     /   \
-filter[foo][bar][baz][]=qux <-- parameter value
+?filter[foo][bar][baz][]=qux<--parameter value
            \___/     \/
              |        \
        2nd component   4th component
 ```
 
-Query parameters that share their 1st component are considered to be part of a
-single _filter object_. For example, the following query string has one filter
-object named `foo`.
+Query parameters that share their 1st component **MUST** be considered part of a
+single _filter object_.
+
+For example, the following query string has one filter object named `foo`:
 
 ```
 ?filter[foo][bar]=baz&filter[foo][qux]=quux
 ```
 
-A filter object **MUST NOT** have only two components.
+The following query string has two filter objects named `foo` and `bar`:
 
-A filter object **MUST NOT** have more than four components.
+```
+?filter[foo]=baz&filter[bar][qux]=quux&filter[bar][qaaz]=womp
+```
+
+## Processing
+
+A `filter` query parameter **MUST NOT** have only two components.
+
+A `filter` query parameter **MUST NOT** have more than four components.
+
+A `filter` query parameter **MUST NOT** have four components unless that query
+parameter contains a `[value]` component and another `filter` query parameter
+in the same filter object contains an `[operator]` component with a parameter
+value is `IN`, `NOT IN`, `BETWEEN` or `NOT BETWEEN`.
 
 The 2nd component of a `filter` query parameter **MUST** be either `[condition]` or
-`[group]`. This component identifies the filter object type. When a `filter`
-query parameter has only one component, its type **MUST** be interpreted as a
-condition filter object.
+`[group]`.
 
-## Processing Condition Filter Objects
+If the 2nd component of a `filter` query parameter is `[condition]` it **MUST** be
+[processed as a condition filter object](#processing-condition-filter-objects).
 
-The 3rd component of a condition filter object **MUST** be one of: `[path]`,
+If the 2nd component of a `filter` query parameter is `[group]` it **MUST** be
+[processed as a group filter object](#processing-group-filter-objects).
+
+When a `filter` query parameter has only one component, its type **MUST** be
+[processed as a condition filter object](#processing-condition-filter-objects).
+
+## <a id="processing-condition-filter-objects"></a>Processing Condition Filter Objects
+
+Condition filter objects can be composed of one or more `filter` query parameters.
+
+The 3rd component of a condition query parameter **MUST** be one of: `[path]`,
 `[operator]`, `[value]` or `[memberOf]`.
 
-A condition filter object with a query parameter that has only one component
-**MUST NOT** contain more than one query parameter.
+A condition query parameter that has only one component **MUST NOT** belong to a
+condition filter group with more than one query parameter.
 
 A condition filter object **MUST** contain a query parameter with a `[path]`
 component unless it has only one query parameter and that query parameter has
 only one component.
+
+A condition filter object that contains a query parameter with only one
+component **MUST** be evaluated with a [path](#condition-paths) parameter value equal to the string
+within the square brackets of the that query parameter's 1st component.
 
 A condition filter object **MUST** contain a query parameter with an `[operator]`
 component unless it contains only one query parameter and that query parameter
@@ -127,15 +154,6 @@ component **MUST** have a parameter value of:
 > The above values are shown unencoded simply for readability. In practice,
 > these characters should be percent-encoded.
 
-A condition filter object query parameter with more than one component **MUST**
-have three components unless that query parameter contains a `[value]` component.
-
-A condition filter object query parameter that contains a `[value]` component
-**MUST NOT** have four components unless that condition filter object has a query
-parameter that contains an `[operator]` component whose parameter value is `IN`,
-`NOT IN`, `BETWEEN` or `NOT BETWEEN`. In that case, the `[value]` query parameter **MUST**
-have `[]` as its 4th component.
-
 A condition filter object with a query parameter that contains an `[operator]`
 component whose parameter value is `IS NULL` or `IS NOT NULL` **MUST NOT** have a
 query parameter that contains a `[value]` component.
@@ -143,11 +161,7 @@ query parameter that contains a `[value]` component.
 A condition filter object that does not contain a query parameter that contains
 an `[operator]` component **MUST** be evaluated for equality.
 
-A condition filter object that contains a query parameter with only one
-component **MUST** be evaluated with a path equal to the string within the square
-brackets of the that query parameter's 1st component.
-
-### Paths
+### <a id="condition-paths"></a>Paths
 
 A filter path is a dot-separated (U+002E FULL-STOP, “.”) list of field names,
 keys of field objects, `meta` object member names or object keys of objects
@@ -180,7 +194,7 @@ A server **MAY** limit the number of allowed field names to any positive value.
 `400 Bad Request` and an error object with a `type` of
 `https://jsonapi.org/profiles/drupal/fancy-filters/invalid-filter-path`.
 
-## Processing Group Filter Objects
+## <a id="processing-group-filter-objects"></a>Processing Group Filter Objects
 
 When the 2nd component of a filter is `[group]`, the 3rd component **MUST** be either
 `[conjunction]` or `[memberOf]`.
